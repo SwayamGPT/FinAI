@@ -7,9 +7,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:5173",
-    "https://finai-frontend.vercel.app" # 🚀 Add your Vercel URL
-]
+        "http://localhost:5173",
+        "https://fin-ai-seven.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,4 +19,3 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/v1/auth")
 app.include_router(finance.router, prefix="/v1/finance")
 app.include_router(ai.router, prefix="/v1/ai")
-
