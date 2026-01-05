@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Auth from './pages/Auth';
-import Dashboard from './pages/Dashboard/index';
+import Dashboard from './pages/Dashboard/index'; // <--- UPDATED PATH
 import Onboarding from './pages/Onboarding';
 import './App.css';
 

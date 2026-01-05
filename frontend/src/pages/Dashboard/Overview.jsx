@@ -1,11 +1,12 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle, TrendingUp, ShieldCheck } from 'lucide-react';
 
 const Overview = ({ data, onAddExpense, onDelete }) => {
     const expenses = data.lists?.expenses || [];
     const health = data.health || {};
     const profile = data.user_profile || {};
+    const strategy = health.debt_strategy || {};
 
     const totalSpent = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     const isOverspending = (health.surplus || 0) < 0;
@@ -45,6 +46,41 @@ const Overview = ({ data, onAddExpense, onDelete }) => {
                 <div className="mt-4 flex gap-4 text-xs">
                     <div className="text-slate-400">Monthly Burn: ₹{(health.monthly_burn || 0).toLocaleString()}</div>
                     <div className="text-slate-400">Net Worth: <span className={(health.net_worth || 0) >= 0 ? "text-emerald-400" : "text-red-400"}>₹{(health.net_worth || 0).toLocaleString()}</span></div>
+                </div>
+            </div>
+
+            {/* STRATEGY & PROJECTION ROW (New) */}
+            <div className="grid grid-cols-2 gap-4">
+                {/* Debt Strategy */}
+                <div className="glass-panel p-4 rounded-2xl border-l-4 border-blue-500">
+                    <div className="flex items-center gap-2 mb-2">
+                        <ShieldCheck size={16} className="text-blue-400" />
+                        <h3 className="text-white text-sm font-bold">Debt Strategy</h3>
+                    </div>
+                    {strategy.strategy === "Avalanche" ? (
+                        <div>
+                            <div className="text-xs text-slate-400">Pay extra ₹{Math.round(strategy.recommended_extra_payment)}/mo to highest interest loan.</div>
+                            <div className="mt-2 text-xs font-bold text-emerald-400">Debt Free by: {strategy.freedom_date}</div>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-500">No active high-interest debt found. Good job!</div>
+                    )}
+                </div>
+
+                {/* Projection */}
+                <div className="glass-panel p-4 rounded-2xl border-l-4 border-purple-500">
+                    <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp size={16} className="text-purple-400" />
+                        <h3 className="text-white text-sm font-bold">1-Year Forecast</h3>
+                    </div>
+                    <div className="text-xs text-slate-400">Projected Net Worth:</div>
+                    {health.projections && health.projections.length > 0 ? (
+                        <div className="text-lg font-bold text-white mt-1">
+                            ₹{Math.round(health.projections[11].net_worth).toLocaleString()}
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-500">Insufficient data</div>
+                    )}
                 </div>
             </div>
 

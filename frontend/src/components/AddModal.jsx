@@ -1,26 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 const AddModal = ({ type, onClose, onSave }) => {
-    // Local state for forms (cleaner than keeping it in Dashboard)
+    // Initialize form with smart defaults based on the modal type
     const [form, setForm] = useState({
-        title: '', amount: '', category: 'Food', // Expense
-        name: '', type: 'Mutual Fund', value: '', liquidity_score: 5, // Asset
-        outstanding_amount: '', interest_rate: '', monthly_payment: '', // Liability
-        target_amount: '', target_date: '', priority: 'Medium' // Goal
+        title: '', amount: '', category: 'Food', // Expense defaults
+
+        name: '',
+        // Dynamic Type Default: If adding liability, default to Credit Card. Else Mutual Fund.
+        type: type === 'liability' ? 'Credit Card' : 'Mutual Fund',
+
+        value: '', liquidity_score: 5, // Asset defaults
+
+        outstanding_amount: '', interest_rate: '', monthly_payment: '', // Liability defaults
+
+        target_amount: '', target_date: '', priority: 'Medium' // Goal defaults
     });
 
-    // Helper to prevent negative numbers
+    // Reset form when modal type changes (just in case)
+    useEffect(() => {
+        setForm(prev => ({
+            ...prev,
+            type: type === 'liability' ? 'Credit Card' : 'Mutual Fund'
+        }));
+    }, [type]);
+
     const preventMinus = (e) => { if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault(); };
 
     const handleSubmit = () => {
-        // Convert numbers before sending
         const payload = { ...form };
+
+        // Convert numeric strings to actual numbers
         ['amount', 'value', 'liquidity_score', 'outstanding_amount', 'interest_rate', 'monthly_payment', 'target_amount'].forEach(k => {
-            if (payload[k]) payload[k] = Number(payload[k]);
+            if (payload[k] !== '' && payload[k] !== undefined) {
+                payload[k] = Number(payload[k]);
+            }
         });
 
-        // Map generic form to specific endpoint
         let endpoint = '';
         if (type === 'expense') endpoint = 'expenses';
         if (type === 'asset') endpoint = 'assets';
@@ -39,14 +55,16 @@ const AddModal = ({ type, onClose, onSave }) => {
                 </div>
 
                 <div className="space-y-3">
+                    {/* EXPENSE FORM */}
                     {type === 'expense' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Title" onChange={e => setForm({ ...form, title: e.target.value })} />
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Amount" onChange={e => setForm({ ...form, amount: e.target.value })} />
                     </>}
 
+                    {/* ASSET FORM */}
                     {type === 'asset' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Name" onChange={e => setForm({ ...form, name: e.target.value })} />
-                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" onChange={e => setForm({ ...form, type: e.target.value })}>
+                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                             {['Mutual Fund', 'Stock', 'Gold', 'Real Estate', 'Crypto', 'Bank'].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Value" onChange={e => setForm({ ...form, value: e.target.value })} />
@@ -57,9 +75,10 @@ const AddModal = ({ type, onClose, onSave }) => {
                         </select>
                     </>}
 
+                    {/* LIABILITY FORM */}
                     {type === 'liability' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Name" onChange={e => setForm({ ...form, name: e.target.value })} />
-                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" onChange={e => setForm({ ...form, type: e.target.value })}>
+                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
                             {['Credit Card', 'Personal Loan', 'Home Loan', 'Car Loan', 'EMI'].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Outstanding Amount" onChange={e => setForm({ ...form, outstanding_amount: e.target.value })} />
@@ -67,6 +86,7 @@ const AddModal = ({ type, onClose, onSave }) => {
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Monthly EMI" onChange={e => setForm({ ...form, monthly_payment: e.target.value })} />
                     </>}
 
+                    {/* GOAL FORM */}
                     {type === 'goal' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Goal Name" onChange={e => setForm({ ...form, name: e.target.value })} />
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Target Amount" onChange={e => setForm({ ...form, target_amount: e.target.value })} />
