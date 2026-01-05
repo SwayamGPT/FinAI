@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api'; // <--- NEW IMPORT
 import { GoogleLogin } from '@react-oauth/google';
-import { Wallet, Lock } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const Auth = () => {
     const navigate = useNavigate();
@@ -13,7 +11,6 @@ const Auth = () => {
 
     const handleSuccess = (data) => {
         localStorage.setItem('token', data.access_token);
-        // Redirect logic: If onboarded -> Dashboard, else -> Onboarding
         if (data.has_onboarded) navigate('/dashboard');
         else navigate('/onboarding');
     };
@@ -21,7 +18,8 @@ const Auth = () => {
     const handleAuth = async () => {
         try {
             const endpoint = mode === 'login' ? '/login' : '/register';
-            const res = await axios.post(`${API_URL}${endpoint}`, input);
+            // 🚀 FIX: Uses /v1/auth prefix automatically
+            const res = await api.post(`/auth${endpoint}`, input);
             if (mode === 'register') { alert("Registered! Now Login."); setMode('login'); }
             else { handleSuccess(res.data); }
         } catch (e) { alert("Auth Failed"); }
@@ -29,7 +27,7 @@ const Auth = () => {
 
     const googleSuccess = async (res) => {
         try {
-            const backendRes = await axios.post(`${API_URL}/google-login`, { token: res.credential });
+            const backendRes = await api.post('/auth/google-login', { token: res.credential });
             handleSuccess(backendRes.data);
         } catch (e) { alert("Google Login Failed"); }
     };

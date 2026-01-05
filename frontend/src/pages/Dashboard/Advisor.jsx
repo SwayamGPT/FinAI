@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import axios from 'axios';
-import { Send, Bot, User, Lock } from 'lucide-react'; // Added Lock icon
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import api from '../../services/api'; // <--- UPDATED: Use centralized API
+import { Send, Bot, User, Lock } from 'lucide-react';
 
 const Advisor = () => {
     const [query, setQuery] = useState('');
@@ -13,12 +11,9 @@ const Advisor = () => {
     // 1. Fetch History on Load
     useEffect(() => {
         const fetchHistory = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return;
             try {
-                const res = await axios.get(`${API_URL}/advisor/history`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // Correct endpoint: /ai/advisor/history (baseURL handles /v1)
+                const res = await api.get('/ai/advisor/history');
                 if (res.data && Array.isArray(res.data)) {
                     setChatLog(res.data);
                 }
@@ -41,21 +36,16 @@ const Advisor = () => {
         setQuery('');
         setLoading(true);
 
+        // Optimistic Update
         const newLog = [...chatLog, { role: 'user', content: currentQuery }];
         setChatLog(newLog);
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post(
-                `${API_URL}/advisor`,
-                { query: currentQuery },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
+            const res = await api.post('/ai/advisor', { query: currentQuery });
             const aiResponse = res.data?.content || "No response.";
             setChatLog([...newLog, { role: 'ai', content: aiResponse }]);
         } catch (err) {
-            setChatLog([...newLog, { role: 'ai', content: "Connection error." }]);
+            setChatLog([...newLog, { role: 'ai', content: "Connection error. Please try again." }]);
         } finally {
             setLoading(false);
         }
@@ -114,7 +104,7 @@ const Advisor = () => {
                 <button
                     onClick={handleSend}
                     disabled={loading || !query.trim()}
-                    className="absolute right-2 top-2 p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white"
+                    className="absolute right-2 top-2 p-2 bg-blue-600 hover:bg-blue-500 rounded-full text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Send size={18} />
                 </button>

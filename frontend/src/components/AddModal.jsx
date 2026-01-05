@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react'; // Added Loader icon
 
 const AddModal = ({ type, onClose, onSave }) => {
-    // Initialize form with smart defaults based on the modal type
+    // UI State
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const [form, setForm] = useState({
-        title: '', amount: '', category: 'Food', // Expense defaults
-
+        title: '', amount: '', category: 'Food',
         name: '',
-        // Dynamic Type Default: If adding liability, default to Credit Card. Else Mutual Fund.
         type: type === 'liability' ? 'Credit Card' : 'Mutual Fund',
-
-        value: '', liquidity_score: 5, // Asset defaults
-
-        outstanding_amount: '', interest_rate: '', monthly_payment: '', // Liability defaults
-
-        target_amount: '', target_date: '', priority: 'Medium' // Goal defaults
+        value: '', liquidity_score: 5,
+        outstanding_amount: '', interest_rate: '', monthly_payment: '',
+        target_amount: '', target_date: '', priority: 'Medium'
     });
 
-    // Reset form when modal type changes (just in case)
     useEffect(() => {
         setForm(prev => ({
             ...prev,
@@ -27,14 +23,18 @@ const AddModal = ({ type, onClose, onSave }) => {
 
     const preventMinus = (e) => { if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault(); };
 
-    const handleSubmit = () => {
-        const payload = { ...form };
+    const handleSubmit = async () => {
+        if (isSubmitting) return; // Guard clause
 
-        // Convert numeric strings to actual numbers
+        // Basic Validation
+        if (type === 'expense' && !form.title) return alert("Title is required");
+        if (type === 'asset' && !form.name) return alert("Asset Name is required");
+
+        setIsSubmitting(true);
+
+        const payload = { ...form };
         ['amount', 'value', 'liquidity_score', 'outstanding_amount', 'interest_rate', 'monthly_payment', 'target_amount'].forEach(k => {
-            if (payload[k] !== '' && payload[k] !== undefined) {
-                payload[k] = Number(payload[k]);
-            }
+            if (payload[k] !== '' && payload[k] !== undefined) payload[k] = Number(payload[k]);
         });
 
         let endpoint = '';
@@ -43,7 +43,13 @@ const AddModal = ({ type, onClose, onSave }) => {
         if (type === 'liability') endpoint = 'liabilities';
         if (type === 'goal') endpoint = 'goals';
 
-        onSave(endpoint, payload);
+        try {
+            await onSave(endpoint, payload);
+            // Modal closes via parent, but we reset state just in case
+        } catch (e) {
+            console.error(e);
+            setIsSubmitting(false); // Re-enable if error
+        }
     };
 
     return (
@@ -51,7 +57,7 @@ const AddModal = ({ type, onClose, onSave }) => {
             <div className="glass-panel w-full max-w-sm p-6 rounded-3xl border border-slate-600 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-white font-bold capitalize">Add {type}</h3>
-                    <button onClick={onClose}><X className="text-slate-400" /></button>
+                    <button onClick={onClose} disabled={isSubmitting}><X className="text-slate-400 hover:text-white" /></button>
                 </div>
 
                 <div className="space-y-3">
@@ -59,6 +65,9 @@ const AddModal = ({ type, onClose, onSave }) => {
                     {type === 'expense' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Title" onChange={e => setForm({ ...form, title: e.target.value })} />
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Amount" onChange={e => setForm({ ...form, amount: e.target.value })} />
+                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                            {['Food', 'Travel', 'Rent', 'Bills', 'Shopping', 'Entertainment', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                     </>}
 
                     {/* ASSET FORM */}
@@ -93,7 +102,13 @@ const AddModal = ({ type, onClose, onSave }) => {
                         <input className="glass-input w-full p-3 rounded-xl text-slate-400" type="date" onChange={e => setForm({ ...form, target_date: e.target.value })} />
                     </>}
 
-                    <button onClick={handleSubmit} className="w-full bg-blue-600 p-3 rounded-xl font-bold text-white mt-4 hover:bg-blue-500">Save</button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="w-full bg-blue-600 p-3 rounded-xl font-bold text-white mt-4 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                    >
+                        {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Saving...</> : 'Save'}
+                    </button>
                 </div>
             </div>
         </div>

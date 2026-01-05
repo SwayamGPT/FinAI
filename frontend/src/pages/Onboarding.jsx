@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api'; // <--- UPDATED: Use centralized API
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 const Onboarding = () => {
     const navigate = useNavigate();
@@ -12,7 +10,6 @@ const Onboarding = () => {
         age: '', salary: '', rent: '', current_savings: '', saving_goal: ''
     });
 
-    // BLOCK negative signs and 'e' (exponential)
     const preventMinus = (e) => {
         if (["-", "+", "e", "E"].includes(e.key)) {
             e.preventDefault();
@@ -21,16 +18,19 @@ const Onboarding = () => {
 
     const submit = async () => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(`${API_URL}/onboard`, {
+            // Updated endpoint: /finance/onboard (handled by api.js baseURL)
+            await api.post('/finance/onboard', {
                 age: Number(data.age),
                 salary: Number(data.salary),
                 rent: Number(data.rent),
                 current_savings: Number(data.current_savings),
                 saving_goal: data.saving_goal
-            }, { headers: { Authorization: `Bearer ${token}` } });
+            });
             navigate('/dashboard');
-        } catch (e) { alert("Failed to save details"); }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to save details. Please try again.");
+        }
     };
 
     return (
