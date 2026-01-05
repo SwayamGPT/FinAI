@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pymongo
+python-dotenv
+pyjwt
+requests
+pydantic
+passlib[bcrypt]
+python-multipart
+google-auth
