@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime
 
+from dateutil.relativedelta import relativedelta
+
 from database import expenses, assets, liabilities, goals
 from services.financial_engine import (
-    calculate_financial_health, EngineProfile, EngineAsset, EngineLiability, EngineGoal,
+    calculate_financial_health, EngineProfile, EngineAsset, EngineLiability, EngineGoal, TRAILING_MONTHS,
 )
 
 log = logging.getLogger(__name__)
@@ -11,8 +13,9 @@ log = logging.getLogger(__name__)
 RECENT_EXPENSES_LIMIT = 50
 
 FALLBACK_HEALTH = {
-    "score": 0, "net_worth": 0, "surplus": 0, "monthly_burn": 0,
-    "recommended_investment": 0, "emergency_months": 0,
+    "score": 0, "score_breakdown": [], "net_worth": 0, "surplus": 0, "monthly_burn": 0,
+    "monthly_expenses": 0, "month_to_date_spent": 0, "total_emi": 0,
+    "recommended_investment": 0, "investment_note": None, "plan": {}, "emergency_months": 0,
     "debt_strategy": {"strategy": "None", "freedom_date": "N/A"},
     "projections": [], "analyzed_goals": [], "allocation": {},
 }
@@ -26,12 +29,12 @@ def serialize(items):
 
 def fetch_user_snapshot(user):
     uname = user["username"]
-    month_prefix = datetime.now().strftime("%Y-%m")
+    # Current month plus the TRAILING_MONTHS before it, for the monthly expense estimate.
+    history_start = (datetime.now().replace(day=1) - relativedelta(months=TRAILING_MONTHS)).strftime("%Y-%m-%d")
 
     u_expenses = list(expenses.find({"username": uname}).sort("date", -1).limit(RECENT_EXPENSES_LIMIT))
-    # Monthly burn must only include this month's expenses, not the last N of all time.
-    month_expenses = list(expenses.find(
-        {"username": uname, "date": {"$regex": f"^{month_prefix}"}}, {"amount": 1}
+    history_expenses = list(expenses.find(
+        {"username": uname, "date": {"$gte": history_start}}, {"amount": 1, "date": 1, "_id": 0}
     ))
     u_assets = list(assets.find({"username": uname}))
     u_liabs = list(liabilities.find({"username": uname}))
@@ -55,10 +58,10 @@ def fetch_user_snapshot(user):
         e_goals = [EngineGoal(
             name=g.get("name", ""), target_amount=g.get("target_amount", 0),
             target_date=g.get("target_date", "2030-01-01"), priority=g.get("priority", "Medium"),
-            id=str(g["_id"]),
+            saved_amount=g.get("saved_amount", 0), id=str(g["_id"]),
         ) for g in u_goals]
 
-        health = calculate_financial_health(profile, month_expenses, e_assets, e_liabs, e_goals)
+        health = calculate_financial_health(profile, history_expenses, e_assets, e_liabs, e_goals)
     except Exception:
         log.exception("Financial engine failed for user %s", uname)
         health = dict(FALLBACK_HEALTH)

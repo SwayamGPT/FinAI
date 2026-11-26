@@ -67,7 +67,8 @@ class GoalModel(BaseMoneyModel):
     name: str = Field(min_length=1, max_length=100)
     target_amount: float = Field(gt=0)
     target_date: str
-    priority: Literal["High", "Medium", "Low"]
+    priority: Literal["High", "Medium", "Low"] = "Medium"
+    saved_amount: float = Field(default=0, ge=0)  # already set aside for this goal (part of your assets)
 
     @field_validator("target_date")
     @classmethod

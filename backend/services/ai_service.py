@@ -27,12 +27,15 @@ def get_ai_context(user_data):
     projections = h.get("projections", [])
     projected_nw = projections[-1]["net_worth"] if projections else 0
     goal_status = ", ".join([f"{g['name']} ({g.get('status','?')})" for g in user_data['lists']['goals']])
+    plan = h.get("plan", {})
 
     return f"""
     ROLE: Strict Indian Financial Advisor.
     METRICS:
     - Health Score: {h.get('score', 0)}/100
-    - Surplus: ₹{h.get('surplus', 0)}
+    - Surplus: ₹{h.get('surplus', 0)} (monthly expenses ₹{h.get('monthly_expenses', 0)}, EMIs ₹{h.get('total_emi', 0)})
+    - Emergency Fund: {h.get('emergency_months', 0)} months
+    - Monthly Plan: emergency ₹{plan.get('emergency_fund', 0)}, debt prepayment ₹{plan.get('debt_prepayment', 0)}, goals ₹{plan.get('goals', 0)}, investing ₹{plan.get('investment', 0)}
     - Debt Free Date: {strategy.get('freedom_date', 'N/A')}
     - Projected Net Worth (1 Year): ₹{projected_nw}
     - Goals: {goal_status}

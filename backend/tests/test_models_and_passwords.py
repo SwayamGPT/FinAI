@@ -30,3 +30,9 @@ def test_invalid_values_rejected():
 
 def test_login_model_is_lenient_for_legacy_accounts():
     assert UserAuth(username=" bob ", password="abc").username == "bob"
+
+
+def test_goal_saved_amount_is_optional():
+    g = GoalModel(name="Trip", target_amount=1000, target_date="2027-01-01", priority="High")
+    assert g.saved_amount == 0
+    assert GoalModel(name="Trip", target_amount=1000, target_date="2027-01-01").priority == "Medium"

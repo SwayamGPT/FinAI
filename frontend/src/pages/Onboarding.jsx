@@ -53,7 +53,7 @@ const Onboarding = () => {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 ml-1">Monthly Salary (₹)</label>
+                            <label className="text-xs text-slate-400 ml-1">Monthly Take-home Salary (₹, after tax)</label>
                             <input
                                 type="number" min="0" onKeyDown={preventMinus}
                                 className="w-full p-3 rounded-xl glass-input mt-1" placeholder="e.g. 30000"
@@ -61,7 +61,7 @@ const Onboarding = () => {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 ml-1">Monthly Rent / EMI (₹)</label>
+                            <label className="text-xs text-slate-400 ml-1">Monthly Rent (₹) — add loan EMIs later as liabilities</label>
                             <input
                                 type="number" min="0" onKeyDown={preventMinus}
                                 className="w-full p-3 rounded-xl glass-input mt-1" placeholder="e.g. 10000"

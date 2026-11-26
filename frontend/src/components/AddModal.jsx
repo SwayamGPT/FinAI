@@ -11,7 +11,7 @@ const AddModal = ({ type, onClose, onSave }) => {
         type: type === 'liability' ? 'Credit Card' : 'Mutual Fund',
         value: '', liquidity_score: 5,
         outstanding_amount: '', interest_rate: '', monthly_payment: '',
-        target_amount: '', target_date: '', priority: 'Medium'
+        target_amount: '', target_date: '', priority: 'Medium', saved_amount: ''
     });
 
     useEffect(() => {
@@ -29,12 +29,14 @@ const AddModal = ({ type, onClose, onSave }) => {
         // Basic Validation
         if (type === 'expense' && !form.title) return alert("Title is required");
         if (type === 'asset' && !form.name) return alert("Asset Name is required");
+        if (type === 'goal' && (!form.name || !form.target_amount || !form.target_date)) return alert("Goal name, amount and date are required");
 
         setIsSubmitting(true);
 
         const payload = { ...form };
-        ['amount', 'value', 'liquidity_score', 'outstanding_amount', 'interest_rate', 'monthly_payment', 'target_amount'].forEach(k => {
-            if (payload[k] !== '' && payload[k] !== undefined) payload[k] = Number(payload[k]);
+        ['amount', 'value', 'liquidity_score', 'outstanding_amount', 'interest_rate', 'monthly_payment', 'target_amount', 'saved_amount'].forEach(k => {
+            if (payload[k] === '' || payload[k] === undefined) delete payload[k];
+            else payload[k] = Number(payload[k]);
         });
 
         let endpoint = '';
@@ -74,7 +76,7 @@ const AddModal = ({ type, onClose, onSave }) => {
                     {type === 'asset' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Name" onChange={e => setForm({ ...form, name: e.target.value })} />
                         <select className="glass-input w-full p-3 rounded-xl bg-slate-800" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>
-                            {['Mutual Fund', 'Stock', 'Gold', 'Real Estate', 'Crypto', 'Bank'].map(t => <option key={t} value={t}>{t}</option>)}
+                            {['Mutual Fund', 'Stock', 'Fixed Deposit', 'Gold', 'Real Estate', 'PF', 'Crypto', 'Bank'].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Value" onChange={e => setForm({ ...form, value: e.target.value })} />
                         <select className="glass-input w-full p-3 rounded-xl bg-slate-800" onChange={e => setForm({ ...form, liquidity_score: e.target.value })}>
@@ -98,7 +100,11 @@ const AddModal = ({ type, onClose, onSave }) => {
                     {/* GOAL FORM */}
                     {type === 'goal' && <>
                         <input className="glass-input w-full p-3 rounded-xl" placeholder="Goal Name" onChange={e => setForm({ ...form, name: e.target.value })} />
-                        <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Target Amount" onChange={e => setForm({ ...form, target_amount: e.target.value })} />
+                        <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Target Amount (today's price)" onChange={e => setForm({ ...form, target_amount: e.target.value })} />
+                        <input className="glass-input w-full p-3 rounded-xl" type="number" onKeyDown={preventMinus} placeholder="Already saved (optional)" onChange={e => setForm({ ...form, saved_amount: e.target.value })} />
+                        <select className="glass-input w-full p-3 rounded-xl bg-slate-800" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
+                            {['High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p} priority</option>)}
+                        </select>
                         <input className="glass-input w-full p-3 rounded-xl text-slate-400" type="date" onChange={e => setForm({ ...form, target_date: e.target.value })} />
                     </>}
 

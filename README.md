@@ -40,183 +40,97 @@ FinAI fixes this by acting as a single source of truth for all financial decisio
 
 ## 📥 Inputs
 
-FinAI consumes raw user data directly from the database.
+FinAI reads raw user data from the database.
 
-### User Profile
+| Input | Fields |
+|---|---|
+| Profile | `salary` (monthly take-home, after tax), `rent`, `current_savings` |
+| Expenses | `amount`, `date` — the current month plus the 3 months before it |
+| Assets | `type` (Bank, Fixed Deposit, Mutual Fund, Stock, Gold, Real Estate, PF, Crypto), `value`, `liquidity_score` 1–5 |
+| Liabilities | `outstanding_amount`, `interest_rate` (% p.a.), `monthly_payment` |
+| Goals | `name`, `target_amount` (today's price), `target_date`, `priority` (High/Medium/Low), `saved_amount` |
 
-{
-  "salary": number,
-  "rent": number,
-  "current_savings": number
-}
-Expenses
-
-
-
-  { "amount": number }
-
-Assets
-
-
-
-  {
-    "type": "Bank | Mutual Fund | Stock | Gold | Real Estate | PF | Crypto",
-    "value": number,
-    "liquidity_score": 1-5
-  }
-
-Liabilities
-
-
-
-  {
-    "outstanding_amount": number,
-    "monthly_payment": number
-  }
-
-Goals
-
-
-
-  {
-    "name": string,
-    "target_amount": number,
-    "target_date": "YYYY-MM-DD"
-  }
+Loan EMIs belong in Liabilities only, never in `rent`, so they are not counted twice.
 
 ## 🧮 What FinAI Calculates
-### 💰 Net Worth
 
+All assumptions live at the top of `financial_engine.py`: inflation 6%, cash 3.5%, equity 10%,
+per-asset returns (FD 7%, stocks 11%, gold 8%, property 5%, PF 8.25%, crypto 0%), high-interest threshold 12%.
 
-Net Worth = Total Assets − Total Debt
-Used to identify long-term financial risk and bankruptcy scenarios.
-
-### 🚨 Emergency Fund (Liquidity-Aware)
-Only assets with liquidity_score ≥ 4 are counted.
-
-To prevent manipulation:
-
-Monthly burn is stabilized
-
-Baseline burn is at least 50% of salary
-
-
-
-Emergency Months = Liquid Assets / Baseline Burn
-### 🔥 Monthly Burn & Surplus
-
-
-Monthly Burn = Rent + Expenses + EMI
-Surplus = Salary − Monthly Burn
-A negative surplus:
-
-Triggers overspending warnings
-
-Reduces the financial health score
-
-### 📈 Investment Recommendation (Capped Logic)
-
-
-Recommended Investment =
-min(
-  30% of monthly surplus,
-  20% of gross salary
+### 1. Monthly expenses (no low-spend optimism)
+```
+monthly_expenses = max(
+  this month so far, scaled to a full month   (only after day 7),
+  average of the last 3 full months with logged expenses
 )
-This prevents:
+Monthly Burn = Rent + monthly_expenses + EMIs
+Surplus      = Salary − Monthly Burn
+```
 
-Unrealistic advice during lean months
+### 2. Emergency fund (liquidity-aware)
+Only savings and assets with `liquidity_score ≥ 4` count. `Emergency Months = Liquid Assets / Monthly Burn`. Target: 6 months.
 
-Over-optimization when lifestyle costs are temporarily low
+### 3. The surplus plan — every rupee is allocated once
+The surplus is split in a fixed order and nothing is counted twice:
 
-### 📊 Financial Ratios
-Savings Rate
+1. **Emergency fund** — 50% of surplus while below 3 months, 20% while between 3 and 6 months.
+2. **High-interest debt** (≥ 12%) — everything that's left, until it is cleared.
+3. **Goals** — High → Medium → Low priority, then nearest date first. Each goal only gets what earlier goals left.
+   While high-interest debt is being prepaid, goals are judged on the money that frees up once it's gone.
+4. **Investing** — whatever remains, but only once 3 months of emergency fund exist and no high-interest debt remains.
+   Otherwise the recommendation is ₹0 with a reason (`investment_note`).
 
+### 4. Debt payoff (true avalanche)
+Each loan is simulated separately, month by month: every loan gets its EMI, the extra payment goes to the highest-rate
+loan, and EMIs freed by paid-off loans roll over to the next one. Compared with paying only minimum EMIs, this gives
+`interest_saved`. Debt not cleared within 30 years is flagged as a debt trap.
 
+### 5. Goals
+```
+inflated_target   = target_amount × (1 + 6%)^years
+remaining         = inflated_target − saved_amount × (1 + r)^months
+required_monthly  = remaining × i / ((1 + i)^n − 1)        (SIP formula)
+```
+`r` is 6% for goals under 3 years, 10% otherwise. Status: **On Track** (fully funded by the plan), **At Risk** (≥ 50%),
+**Unrealistic** (< 50%), **Achieved**, or **Overdue** (date passed, money still needed).
 
-(Surplus / Salary) × 100
-Debt Ratio
+### 6. Net-worth projection (12 months)
+Each asset grows at its own rate, each loan follows the debt simulation (interest added, principal repaid), and plan
+contributions flow into cash, goals or investments. A deficit drains savings. Every point also has `net_worth_real`
+(in today's money). Labels include the year (`Jan 27`).
 
+### 7. Health score (0–100), with a breakdown
+| Component | Max | Full marks when |
+|---|---|---|
+| Savings rate | 25 | saving ≥ 20% of income |
+| Emergency fund | 25 | ≥ 6 months |
+| Debt-to-income | 20 | EMIs ≤ 20% of income (0 at ≥ 50%, or a debt trap) |
+| High-interest debt | 10 | none |
+| Goals on track | 10 | all goals funded (no goals = 5) |
+| Net worth | 10 | ≥ one year of income |
+| Overspending | −20 | penalty scales with the deficit, full at 10% of income |
 
+Every component is continuous (no cliff edges) and is returned in `score_breakdown` with a plain-English reason.
 
-(EMI / Salary) × 100
-These ratios directly influence the health score.
+### 8. Asset allocation
+Percentages are computed in `Decimal` and rounded with the largest-remainder method, so they always sum to exactly 100.
 
-### 🎯 Goal Feasibility Engine
-Each financial goal is evaluated mathematically.
+### 📤 Output (main fields)
+```
+score, score_breakdown[], net_worth, surplus, monthly_burn, monthly_expenses, month_to_date_spent,
+expense_basis{}, total_emi, plan{emergency_fund, debt_prepayment, goals, investment},
+recommended_investment, investment_note, emergency_months, emergency_target,
+debt_strategy{freedom_date, months_to_freedom, recommended_extra_payment, interest_saved, payoff_order[]},
+projections[{month, net_worth, net_worth_real, assets, debt}], analyzed_goals[], allocation{}, assumptions{}
+```
+The frontend only displays these numbers; it does no financial maths of its own.
 
-How it works
-- Calculate months remaining until the target date
-
-- Compute required monthly savings
-
-- Compare against available surplus
-
-Goal Status
-- Status	Meaning
-- On Track	Achievable with current finances
-- At Risk	Requires lifestyle adjustments
-- Impossible	Mathematically infeasible
-
-No false optimism.
-
-### 🏥 Financial Health Score (0–100)
-The score is intentionally conservative and hard to game.
-
-Factors
-- ✅ High savings rate
-
-- ✅ Low debt ratio
-
-- ✅ Adequate emergency fund
-
-- ❌ Overspending
-
-- ❌ High EMI burden
-
-- ❌ Negative net worth
-
-Scores are clamped between 0 and 100.
-
-### 📤 Output Schema
-
-
-{
-  "score": number,
-  "net_worth": number,
-  "total_assets": number,
-  "liquid_assets": number,
-  "monthly_burn": number,
-  "surplus": number,
-  "recommended_investment": number,
-  "emergency_months": number,
-  "savings_rate": number,
-  "debt_ratio": number,
-  "monthly_emi_burden": number,
-  "allocation": object,
-  "analyzed_goals": array
-}
-This output is:
-
-- UI-ready
-
-- AI-safe
-
-- Deterministic
-
-- Easy to test
-
-## 🧪 Edge Cases Handled
-- Zero income
-
-- Overspending months
-
-- Only locked assets
-
-- EMI > salary
-
-- Expired goals
-
-- Negative net worth
+## 🧪 Tests
+```
+cd backend && pip install -r requirements.txt -r requirements-dev.txt && pytest
+```
+Worked examples cover double-counting, avalanche ordering, rollover, SIP/inflation, overdue goals,
+early-month estimates, investment safety, score smoothness and allocation rounding.
 
 ## 🔒 Safety by Design
 FinAI ensures:
