@@ -22,7 +22,10 @@ const Auth = () => {
             const res = await api.post(`/auth${endpoint}`, input);
             if (mode === 'register') { alert("Registered! Now Login."); setMode('login'); }
             else { handleSuccess(res.data); }
-        } catch (e) { alert("Auth Failed"); }
+        } catch (e) {
+            const detail = e.response?.data?.detail;
+            alert(typeof detail === 'string' ? detail : (detail?.[0]?.msg || "Auth Failed"));
+        }
     };
 
     const googleSuccess = async (res) => {
