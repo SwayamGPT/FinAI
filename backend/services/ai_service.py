@@ -1,10 +1,14 @@
+import logging
 import os
-import httpx # Async Client
+import httpx
 from datetime import datetime
 from database import ai_usage, chats
 from utils.security import encrypt_text, decrypt_text
 
+log = logging.getLogger(__name__)
+
 AI_DAILY_LIMIT = 20
+MAX_STORED_MESSAGES = 200  # keep the chat document well under Mongo's 16MB limit
 
 def check_rate_limit(username: str) -> bool:
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -48,9 +52,10 @@ def get_chat_history(username: str, limit=6):
 # 🚀 UPGRADE: Store Metadata
 def save_chat(username: str, user_query: str, ai_response: str, health_score: int):
     # Simple heuristic to guess topic
+    q = user_query.lower()
     topic = "general"
-    if "debt" in user_query.lower() or "loan" in user_query.lower(): topic = "debt"
-    elif "invest" in user_query.lower() or "stock" in user_query.lower(): topic = "investment"
+    if "debt" in q or "loan" in q: topic = "debt"
+    elif "invest" in q or "stock" in q: topic = "investment"
     
     new_messages = [
         {"role": "user", "content": encrypt_text(user_query), "timestamp": datetime.utcnow()},
@@ -64,7 +69,7 @@ def save_chat(username: str, user_query: str, ai_response: str, health_score: in
             }
         }
     ]
-    chats.update_one({"username": username}, {"$push": {"messages": {"$each": new_messages}}}, upsert=True)
+    chats.update_one({"username": username}, {"$push": {"messages": {"$each": new_messages, "$slice": -MAX_STORED_MESSAGES}}}, upsert=True)
 
 # 🚀 UPGRADE: Async Call
 async def call_llm(context: str, query: str, history: list):
@@ -87,8 +92,8 @@ async def call_llm(context: str, query: str, history: list):
             )
             if res.status_code == 200:
                 return res.json()["choices"][0]["message"]["content"]
-            else:
-                return f"Provider Error ({res.status_code}). Try again."
-    except Exception as e:
-        print(f"Async LLM Error: {e}")
+            log.warning("LLM provider returned %s: %s", res.status_code, res.text[:200])
+            return f"Provider Error ({res.status_code}). Try again."
+    except Exception:
+        log.exception("LLM call failed")
         return "I am currently offline due to a connection error."
